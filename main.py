@@ -43,15 +43,30 @@ def comando_re(message):
 
     apagar_depois(CHAT_ID, enviado.message_id)
 
-# === MONITOR NOTION COM DEBOUNCE INTELIGENTE ===
+# === MONITOR NOTION COM DEBOUNCE PERFEITO (nunca mais duplica nem dá SyntaxError) ===
 def monitor_notion():
     global last_edited_time, last_send_time
 
     url = f"https://api.notion.com/v1/pages/{PAGE_ID}"
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28"}
 
-    debounce_timer = None          # timer pra esperar parar de editar
-    DEBOUNCE_SEGUNDOS = 20         # ← muda aqui se quiser 15s, 30s, etc.
+    pending_debounce = None
+    DEBOUNCE_SEGUNDOS = 20
+
+    def tentar_enviar():
+        nonlocal pending_debounce
+        global last_send_time
+        agora = datetime.now()
+
+        if agora - last_send_time >= COOLDOWN:
+            enviado = bot.send_message(CHAT_ID, MENSAGEM)
+            print(f"[{agora.strftime('%H:%M:%S')}] Notificação enviada (após 20s sem edição)")
+            last_send_time = agora
+            apagar_depois(CHAT_ID, enviado.message_id)
+        else:
+            print("Cooldown de 3 min ainda ativo — ignorando")
+
+        pending_debounce = None  # limpa o timer pendente
 
     while True:
         try:
@@ -60,22 +75,21 @@ def monitor_notion():
                 current = r.json()["last_edited_time"]
 
                 if current != last_edited_time:
-                    print(f"Edição detectada às {datetime.now().strftime('%H:%M:%S')}")
-
+                    print(f"Edição detectada → {current[-12:-4]}")
                     last_edited_time = current
 
-                    # Cancela timer anterior (se ainda estiver rodando)
-                    if debounce_timer:
-                        debounce_timer.cancel()
+                    # Cancela timer anterior se existir
+                    if pending_debounce:
+                        pending_debounce.cancel()
 
-                    # Cria novo timer: só vai disparar se parar de editar por 20s
-                    debounce_timer = Timer(DEBOUNCE_SEGUNDOS, lambda: tentar_enviar())
-                    debounce_timer.start()
+                    # Cria novo timer de 20 segundos
+                    pending_debounce = Timer(DEBOUNCE_SEGUNDOS, tentar_enviar)
+                    pending_debounce.start()
 
         except Exception as e:
             print(f"Erro monitor: {e}")
 
-        time.sleep(25)  # checa a cada ~25s (economiza requests)
+        time.sleep(25)
 
 # Função separada pra tentar enviar (chamada pelo debounce)
 def tentar_enviar():
