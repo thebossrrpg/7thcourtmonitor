@@ -41,7 +41,7 @@ def comando_re(message):
 
 # === MONITOR NOTION COM DEBOUNCE 20s + COOLDOWN 3min (perfeito) ===
 def monitor_notion():
-global last_edited_time, last_send_time
+    global last_edited_time, last_send_time
     last_edited_time = None
     last_send_time = datetime.min
 
