@@ -78,29 +78,30 @@ def monitor_notion():
 print("7th Court Roleplay BOT + MONITOR — ONLINE 24/7")
 Thread(target=monitor_notion, daemon=True).start()
 
-# === MATA INSTÂNCIAS ANTIGAS AUTOMATICAMENTE (resolve erro 409 pra sempre) ===
+# === MATA QUALQUER INSTÂNCIA ANTIGA DO BOT (resolve 409 pra sempre) ===
 import os
-import signal
+import sys
 import time
 
-# Espera um pouquinho pra instância antiga morrer
-time.sleep(2)
-# Envia sinal pra matar qualquer processo antigo do mesmo bot
-os.system("pkill -f 'python.*main.py' || true")
+# Dá 3 segundos pra instância antiga terminar de morrer
+time.sleep(3)
 
-bot.infinity_polling()
+# Mata TODOS os processos python que não sejam este atual
+current_pid = os.getpid()
+for pid in os.listdir('/proc'):
+    if pid.isdigit():
+        try:
+            cmdline = open(f'/proc/{pid}/cmdline', 'rb').read()
+            if b'python' in cmdline and b'main.py' in cmdline:
+                if int(pid) != current_pid:
+                    print(f"Matando instância antiga PID {pid}")
+                    os.kill(int(pid), 9)
+        except:
+            pass
 
-# === HEALTH CHECK PRA UPTIME KUMA (roda em paralelo, zero impacto) ===
-from flask import Flask
-import threading
-
-app = Flask(__name__)
-
-@app.route('/health')
-def health():
-    return "7th Court vivo! ❤️", 200
-
-def run_flask():
-    app.run(host='0.0.0.0', port=8080)
-
-threading.Thread(target=run_flask, daemon=True).start()
+# Agora inicia o bot limpo
+try:
+    bot.infinity_polling(none_stop=True, interval=0, timeout=20)
+except Exception as e:
+    print(f"Erro fatal no polling: {e}")
+    os._exit(1)
