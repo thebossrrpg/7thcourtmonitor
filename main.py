@@ -3,6 +3,7 @@ import requests
 import time
 from datetime import datetime, timedelta
 from threading import Thread, Timer
+from flask import Flask
 
 # === CONFIGURAÇÕES ===
 NOTION_TOKEN   = 'ntn_b70490395432oqvvJldbsMBs0H3dbBK0g0GAeEf9VCigUG'
@@ -15,8 +16,19 @@ COOLDOWN = timedelta(minutes=3)
 HORAS_24 = 24 * 60 * 60
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
+app = Flask(__name__)
+
 last_edited_time = None
 last_send_time = datetime.min
+
+# === FLASK HEALTH CHECK ===
+@app.route('/health')
+def health():
+    return '7th Court vivo! ❤️', 200
+
+@app.route('/')
+def home():
+    return '7th Court Monitor - Online', 200
 
 def apagar_depois(chat_id, message_id):
     Timer(HORAS_24, lambda: bot.delete_message(chat_id, message_id)).start()
@@ -38,7 +50,7 @@ def comando_re(message):
         pass
     apagar_depois(CHAT_ID, enviado.message_id)
 
-# === MONITOR NOTION COM DEBOUNCE 20s + COOLDOWN 3min ===
+# === MONITOR NOTION COM DEBOUNCE 30s + COOLDOWN 3min ===
 def monitor_notion():
     global last_edited_time, last_send_time
 
@@ -54,7 +66,7 @@ def monitor_notion():
         agora = datetime.now()
         if agora - last_send_time >= COOLDOWN:
             enviado = bot.send_message(CHAT_ID, MENSAGEM)
-            print(f"[{agora.strftime('%H:%M:%S')}] Notificação enviada (após 20s sem edição)")
+            print(f"[{agora.strftime('%H:%M:%S')}] Notificação enviada (após 30s sem edição)")
             last_send_time = agora
             apagar_depois(CHAT_ID, enviado.message_id)
         pending_debounce = None
@@ -75,33 +87,25 @@ def monitor_notion():
             print(f"Erro monitor: {e}")
         time.sleep(25)
 
+# === FUNÇÃO PARA RODAR O BOT ===
+def run_bot():
+    time.sleep(3)  # Aguarda 3s antes de iniciar
+    print("Iniciando bot Telegram...")
+    try:
+        bot.infinity_polling(none_stop=True, interval=0, timeout=20)
+    except Exception as e:
+        print(f"Erro fatal no polling: {e}")
+
+# === INICIALIZAÇÃO ===
 print("7th Court Roleplay BOT + MONITOR — ONLINE 24/7")
+
+# Inicia o monitor do Notion
 Thread(target=monitor_notion, daemon=True).start()
 
-# === MATA QUALQUER INSTÂNCIA ANTIGA DO BOT (resolve 409 pra sempre) ===
-import os
-import sys
-import time
+# Inicia o bot do Telegram em thread separada
+Thread(target=run_bot, daemon=True).start()
 
-# Dá 3 segundos pra instância antiga terminar de morrer
-time.sleep(3)
-
-# Mata TODOS os processos python que não sejam este atual
-current_pid = os.getpid()
-for pid in os.listdir('/proc'):
-    if pid.isdigit():
-        try:
-            cmdline = open(f'/proc/{pid}/cmdline', 'rb').read()
-            if b'python' in cmdline and b'main.py' in cmdline:
-                if int(pid) != current_pid:
-                    print(f"Matando instância antiga PID {pid}")
-                    os.kill(int(pid), 9)
-        except:
-            pass
-
-# Agora inicia o bot limpo
-try:
-    bot.infinity_polling(none_stop=True, interval=0, timeout=20)
-except Exception as e:
-    print(f"Erro fatal no polling: {e}")
-    os._exit(1)
+# Inicia o Flask (PRINCIPAL - mantém o processo vivo)
+if __name__ == '__main__':
+    print("Iniciando servidor Flask na porta 8000...")
+    app.run(host='0.0.0.0', port=8000, debug=False)
