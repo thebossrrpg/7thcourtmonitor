@@ -46,7 +46,7 @@ def monitor_notion():
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28"}
 
     pending_debounce = None
-    DEBOUNCE_SEGUNDOS = 20
+    DEBOUNCE_SEGUNDOS = 30
 
     def tentar_enviar():
         nonlocal pending_debounce
