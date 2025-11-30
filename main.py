@@ -77,6 +77,17 @@ def monitor_notion():
 
 print("7th Court Roleplay BOT + MONITOR — ONLINE 24/7")
 Thread(target=monitor_notion, daemon=True).start()
+
+# === MATA INSTÂNCIAS ANTIGAS AUTOMATICAMENTE (resolve erro 409 pra sempre) ===
+import os
+import signal
+import time
+
+# Espera um pouquinho pra instância antiga morrer
+time.sleep(2)
+# Envia sinal pra matar qualquer processo antigo do mesmo bot
+os.system("pkill -f 'python.*main.py' || true")
+
 bot.infinity_polling()
 
 # === HEALTH CHECK PRA UPTIME KUMA (roda em paralelo, zero impacto) ===
