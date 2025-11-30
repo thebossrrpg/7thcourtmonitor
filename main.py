@@ -56,50 +56,49 @@ def monitor_notion():
     url = f"https://api.notion.com/v1/pages/{PAGE_ID}"
     headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28"}
     
-    pending_debounce = None
+    silencio_start = None  # Quando começou o período SEM edição
     
-    def tentar_enviar():
-        nonlocal pending_debounce
-        global last_send_time
-        agora = datetime.now()
-        if agora - last_send_time >= COOLDOWN:
-            print(f"[{agora.strftime('%H:%M:%S')}] Verificando cooldown: OK")
-            # VERIFICAÇÃO EXTRA: confirma se ainda não houve edição recente
-            r = requests.get(url, headers=headers, timeout=5)
-            if r.status_code == 200 and r.json()["last_edited_time"] == last_edited_time:
-                enviado = bot.send_message(CHAT_ID, MENSAGEM)
-                print(f"[{agora.strftime('%H:%M:%S')}] Notificação ENVIADA!")
-                last_send_time = agora
-                apagar_depois(CHAT_ID, enviado.message_id)
-            else:
-                print("Edição aconteceu DENTRO dos 30s, cancelando envio")
-        pending_debounce = None
-
     while True:
         try:
             r = requests.get(url, headers=headers, timeout=10)
             if r.status_code == 200:
                 current = r.json()["last_edited_time"]
+                
                 if current != last_edited_time:
-                    print(f"Edição detectada → {current[-12:-4]}")
-                    
-                    # VERIFICA COOLDOWN ANTES de agendar
-                    agora = datetime.now()
-                    if agora - last_send_time < COOLDOWN:
-                        print(f"Cooldown ativo: {(COOLDOWN-(agora-last_send_time)).seconds}s restantes")
-                        last_edited_time = current  # Atualiza mas NÃO agenda
-                        continue
-                    
+                    print(f"🔄 Edição detectada → {current[-12:-4]}")
                     last_edited_time = current
-                    if pending_debounce:
-                        pending_debounce.cancel()
-                    pending_debounce = Timer(30, tentar_enviar)
-                    pending_debounce.start()
-                    print("⏳ Timer 30s iniciado - aguardando confirmação final...")
+                    silencio_start = None  # Reinicia contador de silêncio
+                    continue
+                
+                # NENHUMA edição detectada
+                agora = datetime.now()
+                
+                if silencio_start is None:
+                    # Primeira vez sem edição
+                    silencio_start = agora
+                    print("⏳ Iniciando contagem de silêncio (30s)...")
+                else:
+                    # Já contando silêncio
+                    tempo_silencio = agora - silencio_start
+                    
+                    if tempo_silencio.total_seconds() >= 30:
+                        # 30s SEM EDIÇÃO + cooldown OK?
+                        if agora - last_send_time >= COOLDOWN:
+                            print(f"✅ 30s sem edição + cooldown OK → ENVIANDO!")
+                            enviado = bot.send_message(CHAT_ID, MENSAGEM)
+                            last_send_time = agora
+                            apagar_depois(CHAT_ID, enviado.message_id)
+                            silencio_start = None  # Reset após envio
+                        else:
+                            print(f"⏳ Silêncio ok, mas cooldown: {(COOLDOWN-(agora-last_send_time)).seconds}s restantes")
+                            silencio_start = None  # Reset pra próxima contagem
+                        
+            time.sleep(5)  # Checa a cada 5s (mais preciso)
+            
         except Exception as e:
             print(f"Erro monitor: {e}")
-        time.sleep(10)  # Mais responsivo
-
+            time.sleep(10)
+            
 # === FUNÇÃO PARA RODAR O BOT ===
 def run_bot():
     time.sleep(3)  # Aguarda 3s antes de iniciar
