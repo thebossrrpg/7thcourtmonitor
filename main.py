@@ -1,50 +1,49 @@
-# main.py — 7th Court Roleplay (FINAL – só subir e esquecer)
+# main.py — 7th Court Roleplay (corrigido pro Koyeb)
 import telebot
 import requests
 import time
 from datetime import datetime, timedelta
 from threading import Thread, Timer
 
-# === CONFIGURAÇÕES FINAIS (tudo preenchido) ===
+# === CONFIGURAÇÕES ===
 NOTION_TOKEN   = 'ntn_b70490395432oqvvJldbsMBs0H3dbBK0g0GAeEf9VCigUG'
 PAGE_ID        = '2ad1a427ceb7815598cdffb8271f5d43'
 TELEGRAM_TOKEN = '8218809414:AAFyiyjZyfBYgWDIiw3vdGC5miW9HreyTlw'
-CHAT_ID        = -1003267500349                     # ← seu grupo real
+CHAT_ID        = -1003267500349
 
 MENSAGEM = "Uma nova resposta foi enviada em 7th Court Roleplay."
 COOLDOWN = timedelta(minutes=3)
-HORAS_24 = 24 * 60 * 60  # 86400 segundos
+HORAS_24 = 24 * 60 * 60
 
 bot = telebot.TeleBot(TELEGRAM_TOKEN)
 last_edited_time = None
 last_send_time = datetime.min
 
-# === APAGA MENSAGEM DEPOIS DE 24 HORAS ===
 def apagar_depois(chat_id, message_id):
     Timer(HORAS_24, lambda: bot.delete_message(chat_id, message_id)).start()
 
-# === COMANDO /re (manual) ===
+# === COMANDO /re (corrigido) ===
 @bot.message_handler(commands=['re'])
 def comando_re(message):
     if message.chat.id != CHAT_ID:
         return
+
+    global last_send_time                     # ← movido pra cima
     agora = datetime.now()
     if agora - last_send_time < COOLDOWN:
         return
+
     enviado = bot.reply_to(message, MENSAGEM)
-    global last_send_time
     last_send_time = agora
 
-    # Apaga o /re imediatamente
     try:
         bot.delete_message(CHAT_ID, message.message_id)
     except:
         pass
 
-    # Programa a notificação pra sumir em 24h
     apagar_depois(CHAT_ID, enviado.message_id)
 
-# === MONITOR NOTION (automático) ===
+# === MONITOR NOTION ===
 def monitor_notion():
     global last_edited_time, last_send_time
     url = f"https://api.notion.com/v1/pages/{PAGE_ID}"
