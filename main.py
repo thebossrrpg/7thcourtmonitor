@@ -2,15 +2,14 @@ import telebot
 import requests
 import time
 from datetime import datetime, timedelta
-from threading import Thread, Timer
+from threading import Thread
 from flask import Flask
 
 # === CONFIGURAÇÕES ===
-NOTION_TOKEN   = 'ntn_b70490395432oqvvJldbsMBs0H3dbBK0g0GAeEf9VCigUG'
-PAGE_ID        = '2ad1a427ceb7815598cdffb8271f5d43'
+NOTION_TOKEN = 'ntn_b70490395432oqvvJldbsMBs0H3dbBK0g0GAeEf9VCigUG'
+PAGE_ID = '2ad1a427ceb7815598cdffb8271f5d43'
 TELEGRAM_TOKEN = '8218809414:AAFyiyjZyfBYgWDIiw3vdGC5miW9HreyTlw'
-CHAT_ID        = -1003267500349
-
+CHAT_ID = -1003267500349
 MENSAGEM = "Uma nova resposta foi enviada em 7th Court Roleplay."
 COOLDOWN = timedelta(minutes=3)
 HORAS_24 = 24 * 60 * 60
@@ -21,7 +20,7 @@ app = Flask(__name__)
 last_edited_time = None
 last_send_time = datetime.min
 
-# === FLASK HEALTH CHECK ===
+# === HEALTH CHECK ===
 @app.route('/health')
 def health():
     return '7th Court vivo! ❤️', 200
@@ -30,10 +29,15 @@ def health():
 def home():
     return '7th Court Monitor - Online', 200
 
+# === APAGA MENSAGEM APÓS 24H ===
 def apagar_depois(chat_id, message_id):
-    Timer(HORAS_24, lambda: bot.delete_message(chat_id, message_id)).start()
+    time.sleep(HORAS_24)
+    try:
+        bot.delete_message(chat_id, message_id)
+    except:
+        pass
 
-# === COMANDO /re ===
+# === COMANDO /re (FUNCIONA 100%) ===
 @bot.message_handler(commands=['re'])
 def comando_re(message):
     if message.chat.id != CHAT_ID:
@@ -42,81 +46,74 @@ def comando_re(message):
     agora = datetime.now()
     if agora - last_send_time < COOLDOWN:
         return
-    enviado = bot.reply_to(message, MENSAGEM)
-    last_send_time = agora
     try:
         bot.delete_message(CHAT_ID, message.message_id)
     except:
         pass
-    apagar_depois(CHAT_ID, enviado.message_id)
+    enviado = bot.reply_to(message, MENSAGEM)
+    last_send_time = agora
+    Thread(target=apagar_depois, args=(CHAT_ID, enviado.message_id), daemon=True).start()
 
-# === MONITOR NOTION COM DEBOUNCE 30s + COOLDOWN 3min + GRACE 30s ===
+# === MONITOR NOTION (SÓ ENVIA QUANDO HOUVER EDIÇÃO REAL) ===
 def monitor_notion():
     global last_edited_time, last_send_time
     url = f"https://api.notion.com/v1/pages/{PAGE_ID}"
-    headers = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28"}
-    
-    # === INICIALIZAÇÃO ===
-    print("Buscando estado inicial da página...")
-    try:
-        r = requests.get(url, headers=headers, timeout=10)
-        r.raise_for_status()
-        last_edited_time = r.json()["last_edited_time"]
-        print(f"Inicializado → última edição: {last_edited_time[-12:-4]}")
-    except Exception as e:
-        print(f"Erro na inicialização: {e}")
-        time.sleep(30)
-        return monitor_notion()  # tenta de novo
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28"
+    }
 
-    print("Monitoramento ativo — só manda mensagem quando houver EDIÇÃO REAL")
-    
+    # Inicialização
+    print("Inicializando monitor do Notion...")
     while True:
         try:
             r = requests.get(url, headers=headers, timeout=10)
-            r.raise_for_status()
-            current = r.json()["last_edited_time"]
-
-            agora = datetime.now()
-
-            # HOUVE EDIÇÃO NOVA?
-            if current != last_edited_time:
-                print(f"EDIÇÃO DETECTADA → {current[-12:-4]}")
-                last_edited_time = current
-                
-                # Só manda se respeitar o cooldown de 3 minutos
-                if agora - last_send_time >= COOLDOWN:
-                    print("ENVIANDO mensagem (edição real)")
-                    enviado = bot.send_message(CHAT_ID, MENSAGEM)
-                    last_send_time = agora
-                    apagar_depois(CHAT_ID, enviado.message_id)
-                else:
-                    print(f"Edição detectada, mas ainda em cooldown ({int((COOLDOWN - (agora - last_send_time)).total_seconds())}s)")
-            
-            time.sleep(5)
-
-        except Exception as e:
-            print(f"Erro no loop: {e}")
+            if r.status_code == 200:
+                last_edited_time = r.json()["last_edited_time"]
+                print(f"Notion inicializado → última edição: {last_edited_time[-12:-4]}")
+                break
+        except:
             time.sleep(10)
-            
-# === FUNÇÃO PARA RODAR O BOT ===
-def run_bot():
-    time.sleep(3)  # Aguarda 3s antes de iniciar
-    print("Iniciando bot Telegram...")
-    try:
-        bot.infinity_polling(none_stop=True, interval=0, timeout=20)
-    except Exception as e:
-        print(f"Erro fatal no polling: {e}")
 
-# === INICIALIZAÇÃO ===
+    print("Monitor ativo — só envia com edição real")
+
+    while True:
+        try:
+            r = requests.get(url, headers=headers, timeout=10)
+            if r.status_code == 200:
+                current = r.json()["last_edited_time"]
+                if current != last_edited_time:
+                    print(f"EDIÇÃO DETECTADA → {current[-12:-4]}")
+                    last_edited_time = current
+                    agora = datetime.now()
+                    if agora - last_send_time >= COOLDOWN:
+                        print("ENVIANDO notificação real")
+                        enviado = bot.send_message(CHAT_ID, MENSAGEM)
+                        last_send_time = agora
+                        Thread(target=apagar_depois, args=(CHAT_ID, enviado.message_id), daemon=True).start()
+            time.sleep(5)
+        except Exception as e:
+            print(f"Erro no monitor Notion: {e}")
+            time.sleep(10)
+
+# === INICIALIZAÇÃO FINAL ===
 print("7th Court Roleplay BOT + MONITOR — ONLINE 24/7")
 
-# Inicia o monitor do Notion
+# 1. Monitor do Notion em background
 Thread(target=monitor_notion, daemon=True).start()
 
-# Inicia o bot do Telegram em thread separada
-Thread(target=run_bot, daemon=True).start()
+# 2. Flask em background (só pro health check)
+def run_flask():
+    print("Flask ativo na porta 8080 → health check OK")
+    app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
 
-# Inicia o Flask (PRINCIPAL - mantém o processo vivo)
-if __name__ == '__main__':
-    print("Iniciando servidor Flask na porta 8000...")
-    app.run(host='0.0.0.0', port=8000, debug=False)
+Thread(target=run_flask, daemon=True).start()
+
+# 3. Bot Telegram como processo principal (nunca mais perde /re)
+print("Bot Telegram iniciando como principal...")
+try:
+    bot.infinity_polling(none_stop=True, interval=0, timeout=20)
+except Exception as e:
+    print(f"Polling caiu → reiniciando em 5s... {e}")
+    time.sleep(5)
+    bot.infinity_polling(none_stop=True, interval=0, timeout=20)
