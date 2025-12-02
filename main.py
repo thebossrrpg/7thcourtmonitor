@@ -37,7 +37,7 @@ def apagar_depois(chat_id, message_id):
     except:
         pass
 
-# === COMANDO /re (100% FUNCIONANDO AGORA) ===
+# === COMANDO /re (100% FUNCIONANDO COM APAGAR + ENVIAR) ===
 @bot.message_handler(commands=['re'])
 def comando_re(message):
     if message.chat.id != CHAT_ID:
@@ -48,17 +48,17 @@ def comando_re(message):
     if agora - last_send_time < COOLDOWN:
         return
     
-    # Apaga o /re primeiro
+    # 1. Primeiro envia a mensagem (usando reply_to enquanto o original ainda existe)
+    enviado = bot.reply_to(message, MENSAGEM)
+    last_send_time = agora
+    
+    # 2. Agora apaga o /re original
     try:
         bot.delete_message(CHAT_ID, message.message_id)
     except:
         pass
     
-    # Depois envia a mensagem (reply_to não funciona se o original já foi apagado)
-    enviado = bot.send_message(CHAT_ID, MENSAGEM)
-    last_send_time = agora
-    
-    # Apaga a notificação depois de 24h
+    # 3. Agenda apagar a notificação depois de 24h
     Thread(target=apagar_depois, args=(CHAT_ID, enviado.message_id), daemon=True).start()
 
 # === MONITOR NOTION (SÓ ENVIA QUANDO HOUVER EDIÇÃO REAL) ===
