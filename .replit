@@ -32,3 +32,13 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 34739
+externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+PAGE_ID = "2ad1a427ceb7815598cdffb8271f5d43"
+CHAT_ID = "-1003267500349"

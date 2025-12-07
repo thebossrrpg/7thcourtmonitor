@@ -33,13 +33,20 @@ The application is fully functional and running on Replit with:
 ## Configuration
 
 ### Environment Variables
-The application can be configured using the following environment variables (all have fallback defaults):
+The application requires the following environment variables to be set:
 
+**Required (stored as Replit Secrets):**
 - `NOTION_TOKEN` - Notion API integration token
-- `PAGE_ID` - Notion page ID to monitor
 - `TELEGRAM_TOKEN` - Telegram bot token
+
+**Required (stored as environment variables):**
+- `PAGE_ID` - Notion page ID to monitor
 - `CHAT_ID` - Telegram chat ID for notifications
+
+**Optional:**
 - `MENSAGEM` - Custom notification message (default: "Uma nova resposta foi enviada em 7th Court Roleplay.")
+
+The application will fail with a clear error message if any required variables are missing.
 
 ### Ports
 - Port 5000: Flask health check server (webview)
@@ -54,7 +61,9 @@ The application can be configured using the following environment variables (all
 ## Recent Changes (Dec 7, 2025)
 - Migrated to Replit environment
 - Updated port from 8080 to 5000 for Replit compatibility
-- Added environment variable support for all sensitive credentials
+- **SECURITY**: Removed hardcoded credentials from source code
+- Set up secure credential management using Replit Secrets
+- Added proper environment variable validation with error handling
 - Configured workflow for automatic startup
 - Added Python .gitignore
 
