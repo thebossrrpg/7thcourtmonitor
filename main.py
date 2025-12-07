@@ -7,11 +7,16 @@ from threading import Thread
 from flask import Flask
 
 # === CONFIGURAÇÕES ===
-NOTION_TOKEN = os.getenv('NOTION_TOKEN', 'ntn_b70490395432oqvvJldbsMBs0H3dbBK0g0GAeEf9VCigUG')
-PAGE_ID = os.getenv('PAGE_ID', '2ad1a427ceb7815598cdffb8271f5d43')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN', '8218809414:AAFyiyjZyfBYgWDIiw3vdGC5miW9HreyTlw')
-CHAT_ID = int(os.getenv('CHAT_ID', '-1003267500349'))
+NOTION_TOKEN = os.getenv('NOTION_TOKEN')
+PAGE_ID = os.getenv('PAGE_ID')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+CHAT_ID = os.getenv('CHAT_ID')
 MENSAGEM = os.getenv('MENSAGEM', "Uma nova resposta foi enviada em 7th Court Roleplay.")
+
+if not all([NOTION_TOKEN, PAGE_ID, TELEGRAM_TOKEN, CHAT_ID]):
+    raise ValueError("Missing required environment variables: NOTION_TOKEN, PAGE_ID, TELEGRAM_TOKEN, CHAT_ID")
+
+CHAT_ID = int(CHAT_ID)
 COOLDOWN = timedelta(minutes=3)
 HORAS_24 = 24 * 60 * 60
 
